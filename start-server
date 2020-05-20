@@ -1,0 +1,67 @@
+#!/bin/bash
+
+. /start-utils
+
+shopt -s nullglob
+
+#umask 002
+if ! touch /data/.verify_access; then
+  log "ERROR: /data doesn't seem to be writable. Please make sure attached directory is writable by uid=$(id -u)"
+  exit 2
+fi
+
+rm /data/.verify_access || true
+
+cd /data || exit 1
+
+set -o pipefail
+
+if [[ -z $TERRARIA_VERSION ]]; then
+  log "Environment variable TERRARIA_VERSION not set."
+  log "Set TERRARIA_VERSION to the version name of the VintageStory server."
+  exit 2
+fi
+SERVER_PACKAGE="terraria-server-$TERRARIA_VERSION.zip"
+SERVER="TerrariaServer"
+
+if [ ! -e $SERVER ]; then
+  log "Downloading VintageStory server version $TERRARIA_VERSION..."
+  serverDownloadUrl="https://terraria.org/server/$SERVER_PACKAGE"
+
+  curl -fsSL -o "$SERVER_PACKAGE" "$serverDownloadUrl"
+  result=$?
+  if [ $result != 0 ]; then
+    log "ERROR failed to download server from $serverDownloadUrl ($result)"
+    exit 1
+  fi
+
+  log "Download finished."
+  log "Preparing server..."
+
+  unzip -q -o "$SERVER_PACKAGE"
+  mv -f "$TERRARIA_VERSION"/Linux/* .
+  rm -rf "$TERRARIA_VERSION"
+  rm "$SERVER_PACKAGE"
+  chmod +x TerrariaServer*
+
+  log "Server prepared."
+fi
+
+SERVER_CONFIG="serverconfig.txt"
+
+function setServerProp() {
+  local prop=$1
+  local var=$2
+  if [ -n "$var" ]; then
+    sed -i "/^${prop}\s*=/ c ${prop}=${var}" "$SERVER_CONFIG"
+  fi
+}
+
+if [ ! -e "$SERVER_CONFIG" ]; then
+  cp /tmp/serverconfig.txt "$SERVER_CONFIG"
+fi
+
+setServerProp "port" "$SERVER_PORT"
+setServerProp "worldpath" "worlds"
+
+exec ./TerrariaServer -config "$SERVER_CONFIG" -port "$SERVER_PORT" -steam

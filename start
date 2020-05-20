@@ -1,0 +1,45 @@
+#!/bin/bash
+
+. /start-utils
+
+umask 0002
+chmod g+w /data
+
+if [ "$(id -u)" = 0 ]; then
+  runAsUser=terraria
+  runAsGroup=terraria
+
+  if [[ -v UID ]]; then
+    if [[ $UID != 0 ]]; then
+      if [[ $UID != $(id -u terraria) ]]; then
+        log "Changing uid of terraria to $UID"
+        usermod -u $UID terraria
+      fi
+    else
+      runAsUser=root
+    fi
+  fi
+
+  if [[ -v GID ]]; then
+    if [[ $GID != 0 ]]; then
+      if [[ $GID != $(id -g terraria) ]]; then
+        log "Changing gid of terraria to $GID"
+        groupmod -o -g "$GID" terraria
+      fi
+    else
+      runAsGroup=root
+    fi
+  fi
+
+  if [[ $(stat -c "%u" /data) != "$UID" ]]; then
+    chown -R ${runAsUser}:${runAsGroup} /data
+  fi
+
+  if [[ ${SKIP_NSSWITCH_CONF^^} != TRUE ]]; then
+    echo 'hosts: files dns' >/etc/nsswitch.conf
+  fi
+
+  exec su-exec ${runAsUser}:${runAsGroup} /start-server $@
+else
+  exec /start-server $@
+fi
