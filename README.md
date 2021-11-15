@@ -1,5 +1,8 @@
 # Docker-Terraria-Server
 
+**NOTE**: This repository is deprecated and not longer maintained.
+
+
 A terraria server docker image.
 
 ## Table of Contents
